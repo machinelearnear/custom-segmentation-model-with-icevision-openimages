@@ -1,4 +1,4 @@
-# Entrená un modelo custom de segmentación de imágenes
+# Entrená un modelo custom de segmentación de imágenes con IceVision y OpenImages
 
 Repo que muestra paso a paso como entrenar un modelo que nos haga una prediccion de a que categoria pertenece cada pixel de una imagen. Hay varios frameworks que podemos usar para hacer esto, como [Detectron2](https://github.com/facebookresearch/detectron2) o [TF Object Detection API](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/tf2_detection_zoo.md), pero hoy queria aprovechar para probar una libreria bastante nueva llamada [IceVision](https://github.com/airctic/icevision), que funciona encima de `PyTorch`.
 
