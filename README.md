@@ -6,7 +6,10 @@ En mi experiencia, a menos que podamos resolver nuestro caso de uso con un model
 
 ## TL;DR
 
-- Abri [este Notebook](https://colab.research.google.com/github/machinelearnear/custom-segmentation-model-with-icevision-openimages/blob/master/train_custom_segmentation_model_with_icevision_openimages.ipynb) en `Google Colab` y seguí los pasos para entrenar tu modelo, hacer una predicción sobre una imagen, y guardarlo a tu `Google Drive`.
+- Hace click aca [![Open In Studio Lab](https://studiolab.sagemaker.aws/studiolab.svg)](https://studiolab.sagemaker.aws/import/github/machinelearnear/custom-segmentation-model-with-icevision-openimages/blob/main/train_custom_model.ipynb) para abrir SageMaker StudioLab y seguí los pasos para bajar un dataset anotado para un clase individual, entrenar tu modelo, hacer una predicción sobre una imagen, y guardarlo.
+- Hace click aca [![Open In Studio Lab](https://studiolab.sagemaker.aws/studiolab.svg)](https://studiolab.sagemaker.aws/import/github/machinelearnear/custom-segmentation-model-with-icevision-openimages/blob/main/test_inference.ipynb) para cargar los weights que habias guardado en la notebook anterior y solamente hacer inference sobre imágenes nuevas.
+
+Nota: Para poder correr ambas notebooks hay que crear un Conda environment. Podes hacerlo desde StudioLab dandole click derecho a `environment.yml` > "Build Conda environment".
 
 ## Antes de empezar
 
@@ -18,7 +21,7 @@ En mi experiencia, a menos que podamos resolver nuestro caso de uso con un model
 
 ### Requisitos
 
-- Tener una cuenta de Google para usar [Google Colab](https://colab.research.google.com/)
+- Tener una cuenta de Google para usar [Google Colab](https://colab.research.google.com/) o de [StudioLab](https://studiolab.sagemaker.aws/) para usar Amazon SageMaker.
 
 ### Que es segmentacion de imágenes?
 > Semantic segmentation, or image segmentation, is the task of clustering parts of an image together which belong to the same object class. It is a form of pixel-level prediction because each pixel in an image is classified according to a category.
@@ -29,7 +32,7 @@ En mi experiencia, a menos que podamos resolver nuestro caso de uso con un model
 
 ( Image Credit: [ADE20K – MIT CSAIL Computer Vision Group](https://groups.csail.mit.edu/vision/datasets/ADE20K/) )
 
-### Que es `OpenImages`?
+### Que es el dataset de `OpenImages`?
 
 Es un dataset ([link oficial](https://storage.googleapis.com/openimages/web/index.html)) de unas 9 millones de images con anotaciones que incluyen labels, bounding boxes, segmentation masks, relaciones visuales, etc. Sacado de la pagina oficial:
 
@@ -41,12 +44,17 @@ Es un dataset ([link oficial](https://storage.googleapis.com/openimages/web/inde
 
 Es un framework que permite entrenar modelos de deteccion de objetos y segmentacion de imagenes de manera mucho mas facil y rapida. Esta hecho en Python y funciona encima de librerias como `Fastai`, `PyTorch Lighting`, y otras. Pueden leer mas en su repo oficial: https://github.com/airctic/icevision.
 
-## Entrená tu modelo
+## Pasos para entrenar tu modelo
 
 ### Levantar un environment
 
+**Usando Google Colab**
 Como vamos a estar usando `Google Colab` para entrenar nuestro modelo no necesitamos instalar `Conda` o `pyenv-virtualenv`. Para quienes aun no lo conocen, `Google Colab` corre un environment de Machine Learning sobre un hardware (CPU, GPU, o TPU) que tendremos disponible por un periodo de tiempo limitado (hasta 12 horas). Aunque existen versiones de pago, en su version original es (aún) gratuito y nos permite entrenar algo relativamente complejo bastante facilmente.
 
+**Usando SageMaker StudioLab**
+Podes aprender mas de que es StudioLab a través de [este video](https://www.youtube.com/watch?v=FUEIwAsrMP4) o de [este repo](https://github.com/machinelearnear/sagemaker-studio-lab-quickstart). Abrir directamente las notebooks y darle a `Clone entire repo`. Despues automaticamente deberia crear el environment de Conda. Si no lo hace, entonces click derecho a `environment.yml` y "Build Conda environment".
+
+**Localmente**
 Si, por otra parte, queres correr un environment en tu propia maquina o en Cloud, siempre podes levantar un Docker container con las ultimas librerias, e.g. [Jupyter Data Science Stacks](https://github.com/jupyter/docker-stacks), o tambien usar [Kaggle Kernels](https://www.kaggle.com/kernels) (similar a `Colab`), [Amazon SageMaker](https://aws.amazon.com/sagemaker/), etc.
 
 ### Generar un dataset para entrenar
@@ -134,26 +142,41 @@ list_of_segmentations = [x for x in segmentations_dir.rglob('*.png')]
 Es muy posible que tengamos mas de una segmentacion por imagen asi que vamos a generar un diccionario para que nos ayude a asignar esas segmentaciones a la misma imagen y que al final de todo nos genere el `json`. Sin darle mucha vuelta, me hice esta función que te genera directamente el `json` cuando le metes como input las listas que generamos antes.
 
 ```python
-def create_coco_annotation_json(
-    list_of_images: List[Path], 
-    list_of_segmentations: List[Path],
-    class_map: str = 'hot dog',
-    path_to_output_json: str = 'annotation.json') -> Dict:
+def _create_coco_annotation_json(input_dir:str=None, class_label:str=None, fname:str='coco_annotation.json'):
     """
-    Source: www.machinelearne.ar
+    Author: Nico Metallo
     Generates a COCO annotated json that maps images with segmentation masks
-    :param images_dir: list of images 
-    :param segmentations_dir: list of segmentations masks
-    :param path_to_output_json: map images with segmentations into json
+    :param input_dir: directory where OID V5 annotations are saved
+    :param class_label: one of the 600 class labels available in OID 
+    :param fname: output filename
     """
     from datetime import date
+    from pathlib import Path
+    from collections import defaultdict
+    from PIL import Image
+    import numpy as np
     import json
-
+    import imantics
+    
+    # create list of images/segmentations
+    data_dir = Path(f'{input_dir}/{class_label.lower()}')
+    data_dir.mkdir(parents=True, exist_ok=True)
+    images_dir = data_dir / 'images'
+    annotations_dir = data_dir / 'pascal'
+    segmentations_dir = data_dir / 'segmentations'
+    list_of_images = [x for x in images_dir.rglob('*.jpg')]
+    list_of_segmentations = [x for x in segmentations_dir.rglob('*.png')]
+    
+    # sanity check
+    if not list_of_images or not list_of_segmentations:
+        print('error! no images/segmentations have been found, please check your `input_dir`')
+        return
+    
     # create coco dict
     coco_segm_dict = defaultdict(list, { str(k):[] for k in list_of_images })
     for img in list_of_images:
-      for mask in list_of_segmentations:
-        if img.stem in str(mask): coco_segm_dict[str(img)].append(str(mask))
+        for mask in list_of_segmentations:
+            if img.stem in str(mask): coco_segm_dict[str(img)].append(str(mask))
 
     # create base json
     coco = {
@@ -162,7 +185,7 @@ def create_coco_annotation_json(
             "url": "http://cocodataset.org",
             "version": "1.0",
             "year": 2020,
-            "contributor": "www.machinelearne.ar",
+            "contributor": "Nicolas Metallo",
             "date_created": date.today().strftime("%d/%m/%Y")},
         "images": [],
         "annotations": [],
@@ -173,35 +196,43 @@ def create_coco_annotation_json(
     annotations=[]
     images=[]
     segm_id = 0
+    print('processing...')
     for id, (img,masks) in enumerate(list(coco_segm_dict.items())):
-      image = imantics.Image.from_path(img)
-      for x in masks:
-        array = np.asarray(Image.open(x).resize(image.size))
-        image.add(imantics.Mask(array), category=imantics.Category(class_map))
-        image.id = id
-        coco_json = image.export(style='coco')
-        annotation = coco_json['annotations'][0]
-        annotation['id'] = segm_id
-        annotations.append(coco_json['annotations'][0])
-        segm_id += 1
-      images.append(coco_json['images'][0])
+        image = imantics.Image.from_path(img)
+        for x in masks:
+            array = np.asarray(Image.open(x).resize(image.size))
+            image.add(imantics.Mask(array), category=imantics.Category(class_label))
+            image.id = id
+            coco_json = image.export(style='coco')
+            annotation = coco_json['annotations'][0]
+            # sanity check i.e. avoid invalid polygons
+            annotation['segmentation'] = [x for x in annotation['segmentation'] if len(x) > 2]
+            annotation['id'] = segm_id
+            annotations.append(coco_json['annotations'][0])
+            segm_id += 1
+        images.append(coco_json['images'][0])
+        
     # add to json and save to disk
     coco['categories'] = coco_json['categories']
     coco['annotations'] = annotations
     coco['images'] = images
-
-    with open(path_to_output_json, 'w') as f:
+    
+    save_path = f'{input_dir}/{fname}'
+    with open(save_path, 'w') as f:
         json.dump(coco, f)
-
-    print(f"Done! File was saved to '{Path.cwd()}/{(path_to_output_json)}'")
-    return coco
+    
+    print(f"done! file was saved to `{save_path}`")
+    return coco, save_path, images_dir
 ```
 
 Y si lo corremos en la celda de nuestro Notebook vamos generar el `json`.
 
 ```python
-coco_json = create_coco_annotation_json(list_of_images, list_of_segmentations)
-$ Done! File was saved to '/content/annotation.json'
+coco, save_path, images_dir = _create_coco_annotation_json(
+    input_dir=f"{data_dir}/annotations", class_label=selected_label)
+
+$ processing...
+$ done! file was saved to `./data/annotations/coco_annotation.json`
 ```
 
 ### Parsear la data y ver un preview
@@ -232,23 +263,23 @@ show_records(train_records[:3], ncols=3, class_map=class_map)
 Una de las cosas buenas de [IceVision](https://airctic.com/) es que nos permite usar tanto [FastAI](https://www.fast.ai/) y [PyTorch Lighting](https://github.com/PyTorchLightning/pytorch-lightning) para orquestrar los loops de entrenamiento con un [buen ejemplo](https://airctic.com/quickstart/) acá de como funciona. Vamos a usar el siguiente código para transformar la data (tamaño de la imagen, random crops, rotación, etc.), meterla en un `DataLoader`, crear un modelo `Mask RCNN`, entrenarlo, y después hacer una inferencia sobre un set de validación.
 
 ```python
-# Define the transforms and create the Datasets
-presize = 512
-size = 384
+# Transforms
 shift_scale_rotate = tfms.A.ShiftScaleRotate(rotate_limit=10)
-crop_fn = partial(tfms.A.RandomSizedCrop, min_max_height=(size // 2, size), p=0.5)
+crop_fn = partial(tfms.A.RandomSizedBBoxSafeCrop, p=0.5)
 train_tfms = tfms.A.Adapter(
     [
         *tfms.A.aug_tfms(
-            size=size,
+            size=image_size, 
             presize=presize,
             shift_scale_rotate=shift_scale_rotate,
             crop_fn=crop_fn,
-        ),
-        tfms.A.Normalize(),
+        ), 
+        tfms.A.Normalize()
     ]
 )
-valid_tfms = tfms.A.Adapter([*tfms.A.resize_and_pad(size=size), tfms.A.Normalize()])
+valid_tfms = tfms.A.Adapter([*tfms.A.resize_and_pad(image_size), tfms.A.Normalize()])
+
+# Datasets
 train_ds = Dataset(train_records, train_tfms)
 valid_ds = Dataset(valid_records, valid_tfms)
 
@@ -258,29 +289,30 @@ show_samples(
     samples, denormalize_fn=denormalize_imagenet, ncols=3, display_label=False, show=True
 )
 
-# Create DataLoaders
-train_dl = mask_rcnn.train_dl(train_ds, batch_size=16, shuffle=True, num_workers=4)
-valid_dl = mask_rcnn.valid_dl(valid_ds, batch_size=16, shuffle=False, num_workers=4)
+# mask rcnn
+model_type = models.torchvision.mask_rcnn
+backbone = model_type.backbones.resnet50_fpn()
+metrics = [COCOMetric(metric_type=COCOMetricType.mask)] # error with torchvision and fastai
 
-# Define metrics for the model
-# TODO: Currently broken for Mask RCNN
-# metrics = [COCOMetric(COCOMetricType.mask)]
+# faster rcnn
+# model_type = models.torchvision.faster_rcnn
+# backbone = model_type.backbones.resnet50_fpn
+# metrics = [COCOMetric(metric_type=COCOMetricType.bbox)]
 
-# Create model
-model = mask_rcnn.model(num_classes=len(class_map))
+model = model_type.model(backbone=backbone(pretrained=True), num_classes=len(class_map))
 
-# Create Fastai Learner and train the model
-learn = mask_rcnn.fastai.learner(dls=[train_dl, valid_dl], model=model)
-learn.fine_tune(20, 5e-4, freeze_epochs=2)
+train_dl = model_type.train_dl(train_ds, batch_size=bs, shuffle=True, num_workers=num_workers)
+valid_dl = model_type.valid_dl(valid_ds, batch_size=bs, shuffle=False, num_workers=num_workers)
 
-# BONUS: Use model for inference. In this case, let's take some images from valid_ds
-# Take a look at `Dataset.from_images` if you want to predict from images in memory
+fastai_learner = model_type.fastai.learner(dls=[train_dl, valid_dl], model=model, metrics=metrics)
+if torch.cuda.device_count() > 1: fastai_learner.to_parallel()
+
+fastai_learner.fine_tune(epochs, lr, freeze_epochs=2)
+
+# test on subset of data
 samples = [valid_ds[i] for i in range(6)]
-batch, samples = mask_rcnn.build_infer_batch(samples)
-preds = mask_rcnn.predict(model=model, batch=batch)
-
-imgs = [sample["img"] for sample in samples]
-show_preds(samples=imgs, preds=preds, denormalize_fn=denormalize_imagenet, ncols=3, class_map=class_map)
+preds = model_type.predict(model=model, dataset=samples)
+show_preds(preds=preds, denormalize_fn=denormalize_imagenet)
 ```
 
 Ya tenemos nuestro modelo listo! :ok_hand: 
@@ -293,7 +325,7 @@ Primero definimoos una función que nos devuelva un array de la imagen
 
 ```python
 import PIL, requests
-def image_from_url(url):
+def _download_image(url):
     res = requests.get(url, stream=True)
     img = PIL.Image.open(res.raw)
     return np.array(img)
@@ -302,34 +334,31 @@ def image_from_url(url):
 Después bajamos la imagen que queremos usar
 
 ```python
-image_url = "https://s32020.pcdn.co/wp-content/uploads/2020/06/Choripan-e1593021143177.jpeg.optimal.jpeg"
-img = image_from_url(image_url)
+image_url = "XYZ"
+img = _download_image(image_url)
 show_img(img);
 ```
 
 Y cargamos la mismas transformaciones que usamos cuando entrenamos el modelo antes de hacer la predicción. Aca es donde podemos cambiar la clase que usamos de `hot dog` a `choripan`.
 
 ```python
-infer_tfms = tfms.A.Adapter([*tfms.A.resize_and_pad(size=384), tfms.A.Normalize()])
-infer_ds = Dataset.from_images([img], infer_tfms)
+image_size = 384
+image_array = [img]
 
-batch, samples = mask_rcnn.build_infer_batch(infer_ds)
-preds = mask_rcnn.predict(model=model, batch=batch)
+infer_tfms = tfms.A.Adapter([*tfms.A.resize_and_pad(size=image_size), tfms.A.Normalize()])
+infer_ds = Dataset.from_images(image_array, infer_tfms, class_map=class_map)
 
-# Show preds by grabbing the images from `samples`
-imgs = [sample["img"] for sample in samples]
-show_preds(
-    samples=imgs,
-    preds=preds,
-    class_map=class_map,
-    denormalize_fn=denormalize_imagenet,
-    show=True,
-)
+preds = model_type.predict(model=infer_model, dataset=infer_ds, detection_threshold=0.6)
+show_preds(preds=preds,show=True,figsize=(16,16))
 ```
 
-### Guardar modelo a tu `Google Drive` o bajar localmente
+![Test with sample image](img/infer_model.png "Test with sample image")
+
+### Guardar modelo
 
 Una vez que terminamos de entrenar el modelo vamos a guardarlo en algún lado, a nuestro `Google Drive` si usamos `Colab` por ejemplo, o directamente a nuestro disco. Para esto vamos a exportar el modelo a un `.pth`, que es el formato que usa `PyTorch`.
+
+**Usando Google Colab**
 
 ```python
 from google.colab import drive
@@ -340,6 +369,31 @@ fname = root_dir/'icevision/models/chori/chori_maskrcnn.pth'
 fname.parent.mkdir(parents=True, exist_ok=True)
 
 torch.save(model.state_dict(), fname)
+```
+
+**Cualquier otra opción**
+
+```python
+model_dir='./model_store'
+list_of_labels = [selected_label]
+
+save_dir = Path(model_dir)
+save_dir.mkdir(parents=True, exist_ok=True)
+
+# eager mode - recommended from http://pytorch.org/docs/master/notes/serialization.html
+with open(save_dir/'model.pth', 'wb') as f:
+    torch.save(model.state_dict(), f)
+
+# save list of classes, ordered by index!
+if not isinstance(list_of_labels,list): list_of_labels = [list_of_labels]
+with open(save_dir/'labels.txt', 'w') as f:
+    for c in list_of_labels:
+        f.write(f"{c}\n")
+
+# scripted model - https://discuss.pytorch.org/t/torch-jit-trace-is-not-working-with-mask-rcnn/83244/8
+with torch.no_grad():
+    scripted_model = torch.jit.script(model.eval())
+scripted_model.save(save_dir/'jit-model.pt')
 ```
 
 En otro repo vamos a ver como usar este modelo en producción.
