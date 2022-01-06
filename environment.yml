@@ -11,7 +11,7 @@ dependencies:
   - gh
   - opencv
   - pip:
-    - git+https://github.com/monocongo/openimages
+    # - git+https://github.com/monocongo/openimages
     - icevision[all]
     - imantics
     - -r requirements.txt
