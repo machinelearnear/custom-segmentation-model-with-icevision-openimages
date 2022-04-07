@@ -4,6 +4,9 @@ Repo que muestra paso a paso como entrenar un modelo que nos haga una prediccion
 
 En mi experiencia, a menos que podamos resolver nuestro caso de uso con un modelo `pre-trained`, tener que hacer algo custom se vuelve un trabajo bastante largo bastante rápido por tres cosas: hacer las anotaciones dibujando las masks, el tiempo que toma parsear la data en el formato adecuado para que podamos entrenar el modelo, y el tiempo que toma entrenar. Sobre el segundo punto, por ejemplo, una buena herramienta para anotar es [VGG Image Annotator](https://www.robots.ox.ac.uk/~vgg/software/via/via.html) pero el vocabulario que usa (la forma en que se guardan los datos en un `json`) se llama `PASCAL VOC` y normalmente vamos a tener que convertirla a `COCO` ([Common Objects in Context](https://cocodataset.org/)) antes de entrenar. Esto podemos solucionarlo con conversores (que hay varios) o con los parser que trae incluido `IceVision` pero aun nos quedan las otras dos cosas, especialmente la parte de anotar. Para resolver un poco esto agregue una parte donde vamos a bajar las anotaciones directamente de [OpenImages](https://storage.googleapis.com/openimages/web/index.html) para alguna de las 1,000 categorias que tienen disponibles.
 
+## Watch YouTube Explainer Video
+[![OpenImages: Cómo Detectar un Choripan con ML (+Repo)](https://img.youtube.com/vi/uf9bWRxtBgY/0.jpg)](https://www.youtube.com/watch?v=uf9bWRxtBgY)
+
 ## TL;DR
 
 - Hace click aca [![Open In Studio Lab](https://studiolab.sagemaker.aws/studiolab.svg)](https://studiolab.sagemaker.aws/import/github/machinelearnear/custom-segmentation-model-with-icevision-openimages/blob/main/train_custom_model.ipynb) para abrir SageMaker StudioLab y seguí los pasos para bajar un dataset anotado para un clase individual, entrenar tu modelo, hacer una predicción sobre una imagen, y guardarlo.
