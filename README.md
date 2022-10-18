@@ -9,8 +9,8 @@ En mi experiencia, a menos que podamos resolver nuestro caso de uso con un model
 
 ## TL;DR
 
-- Hace click aca [![Open In Studio Lab](https://studiolab.sagemaker.aws/studiolab.svg)](https://studiolab.sagemaker.aws/import/github/machinelearnear/custom-segmentation-model-with-icevision-openimages/blob/main/train_custom_model.ipynb) para abrir SageMaker StudioLab y seguí los pasos para bajar un dataset anotado para un clase individual, entrenar tu modelo, hacer una predicción sobre una imagen, y guardarlo.
-- Hace click aca [![Open In Studio Lab](https://studiolab.sagemaker.aws/studiolab.svg)](https://studiolab.sagemaker.aws/import/github/machinelearnear/custom-segmentation-model-with-icevision-openimages/blob/main/test_inference.ipynb) para cargar los weights que habias guardado en la notebook anterior y solamente hacer inference sobre imágenes nuevas.
+- Hace click aca [![Open In Studio Lab](https://studiolab.sagemaker.aws/studiolab.svg)](https://studiolab.sagemaker.aws/import/github/machinelearnear/custom-segmentation-model-with-icevision-openimages/blob/main/0_train_custom_model.ipynb) para abrir SageMaker StudioLab y seguí los pasos para bajar un dataset anotado para un clase individual, entrenar tu modelo, hacer una predicción sobre una imagen, y guardarlo.
+- Hace click aca [![Open In Studio Lab](https://studiolab.sagemaker.aws/studiolab.svg)](https://studiolab.sagemaker.aws/import/github/machinelearnear/custom-segmentation-model-with-icevision-openimages/blob/main/1_inference_test.ipynb) para cargar los weights que habias guardado en la notebook anterior y solamente hacer inference sobre imágenes nuevas.
 
 Nota: Para poder correr ambas notebooks hay que crear un Conda environment. Podes hacerlo desde StudioLab dandole click derecho a `environment.yml` > "Build Conda environment".
 
